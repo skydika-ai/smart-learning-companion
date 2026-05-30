@@ -8,37 +8,82 @@ use Illuminate\Http\Request;
 
 class KuisController extends Controller
 {
+    public function index()
+    {
+        $kuisList = Kuis::whereHas('materi', function ($q) {
+                $q->where('user_id', auth()->id());
+            })
+            ->with(['materi', 'soalKuis', 'hasilKuis' => function ($q) {
+                $q->where('user_id', auth()->id())->latest();
+            }])
+            ->latest()
+            ->get();
+
+        return view('kuis.index', compact('kuisList'));
+    }
+
     public function show(Kuis $kuis)
     {
-        if ($kuis->user_id !== auth()->id()) abort(403);
-        
-        $kuis->load('soalKuis');
-        return view('kuis.show', compact('kuis'));
+        if ($kuis->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $kuis->load('soalKuis', 'materi');
+        $total = $kuis->soalKuis->count();
+
+        return view('kuis.show', compact('kuis', 'total'));
     }
 
     public function submit(Request $request, Kuis $kuis)
     {
-        if ($kuis->user_id !== auth()->id()) abort(403);
+        if ($kuis->user_id !== auth()->id()) {
+            abort(403);
+        }
 
-        $jawabanUser = $request->input('jawaban', []);
+        $jawabanUser = collect($request->input('jawaban', []))
+            ->mapWithKeys(fn($val, $key) => [(string)$key => strtolower(trim($val))])
+            ->toArray();
+
+        $waktuPengerjaan = min((int) $request->input('waktu_pengerjaan', 0), 3600);
+
         $soals = $kuis->soalKuis;
         $benar = 0;
 
         foreach ($soals as $soal) {
-            if (isset($jawabanUser[$soal->id]) && $jawabanUser[$soal->id] === $soal->jawaban_benar) {
+            $jawabanDiberikan = $jawabanUser[(string)$soal->id] ?? null;
+            $jawabanBenar     = strtolower(trim($soal->jawaban_benar));
+
+            if ($jawabanDiberikan && $jawabanDiberikan === $jawabanBenar) {
                 $benar++;
             }
         }
 
-        $skor = count($soals) > 0 ? round(($benar / count($soals)) * 100) : 0;
+        $skor = $soals->count()
+            ? round(($benar / $soals->count()) * 100)
+            : 0;
 
-        HasilKuis::create([
-            'kuis_id' => $kuis->id,
-            'user_id' => auth()->id(),
-            'skor' => $skor,
-            'jawaban_user' => $jawabanUser,
+        $hasil = HasilKuis::create([
+            'kuis_id'          => $kuis->id,
+            'user_id'          => auth()->id(),
+            'skor'             => $skor,
+            'jawaban_user'     => $jawabanUser,
+            'waktu_pengerjaan' => $waktuPengerjaan,
         ]);
 
-        return redirect()->route('dashboard')->with('success', 'Kuis berhasil diselesaikan dengan skor ' . $skor);
+        return redirect()->route('kuis.result', [
+            'kuis'  => $kuis->id,
+            'hasil' => $hasil->id,
+        ]);
+    }
+
+    public function result(Kuis $kuis, HasilKuis $hasil)
+    {
+        if ($hasil->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $kuis->load('soalKuis', 'materi');
+
+        return view('kuis.result', compact('kuis', 'hasil'));
     }
 }

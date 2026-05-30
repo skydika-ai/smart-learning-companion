@@ -4,12 +4,20 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 
-#[Fillable(['user_id', 'judul', 'file_path', 'teks_ekstrak', 'ringkasan'])]
 class Materi extends Model
 {
     use HasFactory;
+
+    protected $table = 'materis';
+
+    protected $fillable = [
+        'user_id',
+        'judul',
+        'file_path',
+        'teks_ekstrak',
+        'ringkasan',
+    ];
 
     public function user()
     {

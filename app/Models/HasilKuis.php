@@ -3,20 +3,20 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 
-#[Fillable(['kuis_id', 'user_id', 'skor', 'jawaban_user'])]
 class HasilKuis extends Model
 {
-    use HasFactory;
+    protected $fillable = [
+        'kuis_id',
+        'user_id',
+        'skor',
+        'jawaban_user',
+        'waktu_pengerjaan',
+    ];
 
-    protected function casts(): array
-    {
-        return [
-            'jawaban_user' => 'array',
-        ];
-    }
+    protected $casts = [
+        'jawaban_user' => 'array',
+    ];
 
     public function kuis()
     {
